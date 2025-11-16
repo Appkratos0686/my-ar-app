@@ -1,0 +1,5 @@
+crack
+water_damage
+mold
+structural
+surface_wear

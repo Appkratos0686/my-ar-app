@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AR Room Scanner</string>
+    <string name="start_scanning">Start Scanning</string>
+    <string name="stop_scanning">Stop Scanning</string>
+    <string name="detecting_materials">Detecting Materials…</string>
+    <string name="analyzing_damage">Analyzing Damage…</string>
+    <string name="processing_spatial_data">Processing Spatial Data…</string>
+    <string name="camera_permission_required">Camera permission is required for AR scanning</string>
+    <string name="ar_not_supported">AR is not supported on this device</string>
+    <string name="model_loading">Loading AI models…</string>
+    <string name="material_detected">Material: %s (Confidence: %.1f%%)</string>
+    <string name="damage_detected">Damage: %s (Severity: %.1f%%)</string>
+    <string name="fallback_model_active">Using fallback AI model</string>
+</resources>
