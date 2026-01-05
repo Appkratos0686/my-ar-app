@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AR Room Scanner</string>
+    <string name="app_description">Scan and analyze rooms in 3D using AR and AI</string>
+    <string name="app_description_detailed">An innovative mobile app that leverages augmented reality (AR) and TensorFlow Lite to scan and analyze rooms in 3D. Detects material types, evaluates damage, and processes spatial data in real-time.</string>
+    <string name="feature_3d_scanning">• 3D Room Scanning with ARCore</string>
+    <string name="feature_material_detection">• AI-Powered Material Detection</string>
+    <string name="feature_damage_evaluation">• Automated Damage Assessment</string>
+    <string name="feature_real_time">• Real-Time Analysis</string>
     <string name="start_scanning">Start Scanning</string>
     <string name="stop_scanning">Stop Scanning</string>
     <string name="detecting_materials">Detecting Materials…</string>
