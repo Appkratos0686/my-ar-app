@@ -44,11 +44,11 @@ class ARScannerActivity : AppCompatActivity() {
             materialDetector = MaterialDetector(applicationContext)
             damageEvaluator = DamageEvaluator(applicationContext)
             
-            val materialInitialized = materialDetector.initialize()
-            val damageInitialized = damageEvaluator.initialize()
+            val isMaterialDetectorInitialized = materialDetector.initialize()
+            val isDamageEvaluatorInitialized = damageEvaluator.initialize()
             
             withContext(Dispatchers.Main) {
-                if (!materialInitialized || !damageInitialized) {
+                if (!isMaterialDetectorInitialized || !isDamageEvaluatorInitialized) {
                     updateStatus("Warning: Some AI models failed to load. Using fallback models.")
                 }
                 
@@ -61,13 +61,13 @@ class ARScannerActivity : AppCompatActivity() {
     
     private fun setupAR() {
         // Check AR availability
-        val availability = ArCoreApk.getInstance().checkAvailability(this)
-        if (availability.isTransient) {
+        val arCoreAvailability = ArCoreApk.getInstance().checkAvailability(this)
+        if (arCoreAvailability.isTransient) {
             // Re-query at 5Hz while compatibility is checked in the background.
             return
         }
         
-        if (!availability.isSupported) {
+        if (!arCoreAvailability.isSupported) {
             Toast.makeText(this, R.string.ar_not_supported, Toast.LENGTH_LONG).show()
             finish()
             return
@@ -75,12 +75,12 @@ class ARScannerActivity : AppCompatActivity() {
         
         try {
             arSession = Session(this)
-            val config = Config(arSession)
-            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
-            arSession?.configure(config)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Failed to create AR session: ${e.message}", Toast.LENGTH_LONG).show()
+            val sessionConfig = Config(arSession)
+            sessionConfig.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+            sessionConfig.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
+            arSession?.configure(sessionConfig)
+        } catch (sessionCreationException: Exception) {
+            Toast.makeText(this, "Failed to create AR session: ${sessionCreationException.message}", Toast.LENGTH_LONG).show()
             finish()
         }
     }
@@ -115,11 +115,11 @@ class ARScannerActivity : AppCompatActivity() {
                     processARFrame()
                     kotlinx.coroutines.delay(100) // Process at ~10 FPS
                 }
-            } catch (e: Exception) {
+            } catch (scanningException: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@ARScannerActivity,
-                        "Error during scanning: ${e.message}",
+                        "Error during scanning: ${scanningException.message}",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -134,21 +134,21 @@ class ARScannerActivity : AppCompatActivity() {
     private suspend fun processARFrame() {
         arSession?.let { session ->
             try {
-                val frame = session.update()
+                val arFrame = session.update()
                 
                 // Process spatial data
-                val spatialData = arScanner.processFrame(frame)
+                val scannedSpatialData = arScanner.processFrame(arFrame)
                 
-                spatialData?.let { data ->
+                scannedSpatialData?.let { rawSpatialData ->
                     // Preprocess spatial data
-                    val processedData = withContext(Dispatchers.Default) {
-                        val filtered = SpatialDataPreprocessor.filterOutliers(data.points)
-                        val downsampled = SpatialDataPreprocessor.downsample(filtered, 1000)
-                        data.copy(points = downsampled)
+                    val preprocessedSpatialData = withContext(Dispatchers.Default) {
+                        val filteredPoints = SpatialDataPreprocessor.filterOutliers(rawSpatialData.points)
+                        val downsampledPoints = SpatialDataPreprocessor.downsample(filteredPoints, 1000)
+                        rawSpatialData.copy(points = downsampledPoints)
                     }
                     
                     withContext(Dispatchers.Main) {
-                        updateStatus("Points: ${processedData.points.size}, Planes: ${processedData.planes.size}")
+                        updateStatus("Points: ${preprocessedSpatialData.points.size}, Planes: ${preprocessedSpatialData.planes.size}")
                     }
                     
                     // Periodically run ML detection (every 1 second)
@@ -156,7 +156,7 @@ class ARScannerActivity : AppCompatActivity() {
                         runMLDetection()
                     }
                 }
-            } catch (e: Exception) {
+            } catch (frameProcessingException: Exception) {
                 // Silently handle frame processing errors
             }
         }
@@ -197,7 +197,7 @@ class ARScannerActivity : AppCompatActivity() {
         super.onResume()
         try {
             arSession?.resume()
-        } catch (e: Exception) {
+        } catch (resumeException: Exception) {
             // Handle resume error
         }
     }
