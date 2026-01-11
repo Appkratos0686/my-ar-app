@@ -43,19 +43,19 @@ class ARScanner {
      * Extract 3D points from point cloud
      */
     private fun extractPoints(pointCloud: PointCloud) {
-        val points = pointCloud.points
-        points.rewind()
+        val pointCloudBuffer = pointCloud.points
+        pointCloudBuffer.rewind()
         
         val newPoints = mutableListOf<Point3D>()
-        while (points.hasRemaining()) {
-            val x = points.float
-            val y = points.float
-            val z = points.float
-            val confidence = points.float
+        while (pointCloudBuffer.hasRemaining()) {
+            val xCoordinate = pointCloudBuffer.float
+            val yCoordinate = pointCloudBuffer.float
+            val zCoordinate = pointCloudBuffer.float
+            val confidenceScore = pointCloudBuffer.float
             
             // Only add points with sufficient confidence
-            if (confidence > 0.5f) {
-                newPoints.add(Point3D(x, y, z))
+            if (confidenceScore > 0.5f) {
+                newPoints.add(Point3D(xCoordinate, yCoordinate, zCoordinate))
             }
         }
         
@@ -63,8 +63,8 @@ class ARScanner {
         pointBuffer.addAll(newPoints)
         if (pointBuffer.size > 10000) {
             // Keep most recent points
-            val removeCount = pointBuffer.size - 10000
-            repeat(removeCount) { pointBuffer.removeAt(0) }
+            val pointsToRemoveCount = pointBuffer.size - 10000
+            repeat(pointsToRemoveCount) { pointBuffer.removeAt(0) }
         }
     }
     
@@ -74,20 +74,20 @@ class ARScanner {
     private fun extractPlanes(frame: Frame) {
         planeBuffer.clear()
         
-        for (plane in frame.updatedTrackables.filterIsInstance<Plane>()) {
-            if (plane.trackingState == TrackingState.TRACKING) {
-                val centerPose = plane.centerPose
-                val center = Point3D(
-                    centerPose.tx(),
-                    centerPose.ty(),
-                    centerPose.tz()
+        for (detectedPlane in frame.updatedTrackables.filterIsInstance<Plane>()) {
+            if (detectedPlane.trackingState == TrackingState.TRACKING) {
+                val planeCenterPose = detectedPlane.centerPose
+                val planeCenterPoint = Point3D(
+                    planeCenterPose.tx(),
+                    planeCenterPose.ty(),
+                    planeCenterPose.tz()
                 )
                 
                 // Get plane normal
-                val forward = centerPose.zAxis
-                val normal = Point3D(forward[0], forward[1], forward[2])
+                val forwardAxis = planeCenterPose.zAxis
+                val planeNormalVector = Point3D(forwardAxis[0], forwardAxis[1], forwardAxis[2])
                 
-                val planeType = when (plane.type) {
+                val detectedPlaneType = when (detectedPlane.type) {
                     Plane.Type.HORIZONTAL_UPWARD_FACING -> PlaneType.HORIZONTAL_UPWARD_FACING
                     Plane.Type.HORIZONTAL_DOWNWARD_FACING -> PlaneType.HORIZONTAL_DOWNWARD_FACING
                     Plane.Type.VERTICAL -> PlaneType.VERTICAL
@@ -96,11 +96,11 @@ class ARScanner {
                 
                 planeBuffer.add(
                     Plane3D(
-                        centerPoint = center,
-                        normal = normal,
-                        extentX = plane.extentX,
-                        extentZ = plane.extentZ,
-                        type = planeType
+                        centerPoint = planeCenterPoint,
+                        normal = planeNormalVector,
+                        extentX = detectedPlane.extentX,
+                        extentZ = detectedPlane.extentZ,
+                        type = detectedPlaneType
                     )
                 )
             }

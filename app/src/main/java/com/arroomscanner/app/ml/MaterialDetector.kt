@@ -34,27 +34,27 @@ class MaterialDetector(private val context: Context) {
     fun initialize(): Boolean {
         return try {
             // Try to load primary model
-            val primaryModel = loadModelFile(PRIMARY_MODEL)
-            interpreter = Interpreter(primaryModel)
+            val primaryModelBuffer = loadModelFile(PRIMARY_MODEL)
+            interpreter = Interpreter(primaryModelBuffer)
             
             // Load fallback model
             try {
-                val fallbackModel = loadModelFile(FALLBACK_MODEL)
-                fallbackInterpreter = Interpreter(fallbackModel)
-            } catch (e: Exception) {
+                val fallbackModelBuffer = loadModelFile(FALLBACK_MODEL)
+                fallbackInterpreter = Interpreter(fallbackModelBuffer)
+            } catch (fallbackLoadException: Exception) {
                 // Fallback model is optional
             }
             
             true
-        } catch (e: Exception) {
+        } catch (primaryLoadException: Exception) {
             // Try fallback if primary fails
             try {
-                val fallbackModel = loadModelFile(FALLBACK_MODEL)
-                fallbackInterpreter = Interpreter(fallbackModel)
+                val fallbackModelBuffer = loadModelFile(FALLBACK_MODEL)
+                fallbackInterpreter = Interpreter(fallbackModelBuffer)
                 interpreter = fallbackInterpreter
                 isUsingFallback = true
                 true
-            } catch (e2: Exception) {
+            } catch (fallbackLoadException: Exception) {
                 false
             }
         }
@@ -71,18 +71,18 @@ class MaterialDetector(private val context: Context) {
         
         try {
             // Preprocess image
-            val inputBuffer = ImagePreprocessor.bitmapToByteBuffer(bitmap, inputWidth, inputHeight)
+            val modelInputBuffer = ImagePreprocessor.bitmapToByteBuffer(bitmap, inputWidth, inputHeight)
             
             // Run inference
-            val outputArray = Array(1) { FloatArray(MaterialType.values().size - 1) } // -1 for UNKNOWN
-            currentInterpreter.run(inputBuffer, outputArray)
+            val modelOutputArray = Array(1) { FloatArray(MaterialType.values().size - 1) } // -1 for UNKNOWN
+            currentInterpreter.run(modelInputBuffer, modelOutputArray)
             
             // Find highest confidence
-            val outputs = outputArray[0]
-            val maxIndex = outputs.indices.maxByOrNull { outputs[it] } ?: 0
-            val confidence = outputs[maxIndex]
+            val materialProbabilities = modelOutputArray[0]
+            val highestConfidenceIndex = materialProbabilities.indices.maxByOrNull { materialProbabilities[it] } ?: 0
+            val detectionConfidence = materialProbabilities[highestConfidenceIndex]
             
-            val materialType = when (maxIndex) {
+            val detectedMaterialType = when (highestConfidenceIndex) {
                 0 -> MaterialType.WOOD
                 1 -> MaterialType.CONCRETE
                 2 -> MaterialType.DRYWALL
@@ -94,9 +94,9 @@ class MaterialDetector(private val context: Context) {
                 else -> MaterialType.UNKNOWN
             }
             
-            return MaterialDetectionResult(materialType, confidence)
+            return MaterialDetectionResult(detectedMaterialType, detectionConfidence)
             
-        } catch (e: Exception) {
+        } catch (detectionException: Exception) {
             // Try fallback on error
             if (!isUsingFallback && fallbackInterpreter != null) {
                 interpreter = fallbackInterpreter
@@ -117,12 +117,12 @@ class MaterialDetector(private val context: Context) {
      * Load model file from assets
      */
     private fun loadModelFile(filename: String): MappedByteBuffer {
-        val fileDescriptor = context.assets.openFd("models/$filename")
-        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
-        val fileChannel = inputStream.channel
-        val startOffset = fileDescriptor.startOffset
-        val declaredLength = fileDescriptor.declaredLength
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+        val assetFileDescriptor = context.assets.openFd("models/$filename")
+        val modelFileInputStream = FileInputStream(assetFileDescriptor.fileDescriptor)
+        val modelFileChannel = modelFileInputStream.channel
+        val modelStartOffset = assetFileDescriptor.startOffset
+        val modelDeclaredLength = assetFileDescriptor.declaredLength
+        return modelFileChannel.map(FileChannel.MapMode.READ_ONLY, modelStartOffset, modelDeclaredLength)
     }
     
     /**

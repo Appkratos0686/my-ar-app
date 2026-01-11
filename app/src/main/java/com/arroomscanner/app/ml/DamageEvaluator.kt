@@ -34,27 +34,27 @@ class DamageEvaluator(private val context: Context) {
     fun initialize(): Boolean {
         return try {
             // Try to load primary model
-            val primaryModel = loadModelFile(PRIMARY_MODEL)
-            interpreter = Interpreter(primaryModel)
+            val primaryModelBuffer = loadModelFile(PRIMARY_MODEL)
+            interpreter = Interpreter(primaryModelBuffer)
             
             // Load fallback model
             try {
-                val fallbackModel = loadModelFile(FALLBACK_MODEL)
-                fallbackInterpreter = Interpreter(fallbackModel)
-            } catch (e: Exception) {
+                val fallbackModelBuffer = loadModelFile(FALLBACK_MODEL)
+                fallbackInterpreter = Interpreter(fallbackModelBuffer)
+            } catch (fallbackLoadException: Exception) {
                 // Fallback model is optional
             }
             
             true
-        } catch (e: Exception) {
+        } catch (primaryLoadException: Exception) {
             // Try fallback if primary fails
             try {
-                val fallbackModel = loadModelFile(FALLBACK_MODEL)
-                fallbackInterpreter = Interpreter(fallbackModel)
+                val fallbackModelBuffer = loadModelFile(FALLBACK_MODEL)
+                fallbackInterpreter = Interpreter(fallbackModelBuffer)
                 interpreter = fallbackInterpreter
                 isUsingFallback = true
                 true
-            } catch (e2: Exception) {
+            } catch (fallbackLoadException: Exception) {
                 false
             }
         }
@@ -72,23 +72,23 @@ class DamageEvaluator(private val context: Context) {
         
         try {
             // Preprocess image
-            val inputBuffer = ImagePreprocessor.bitmapToByteBuffer(bitmap, inputWidth, inputHeight)
+            val modelInputBuffer = ImagePreprocessor.bitmapToByteBuffer(bitmap, inputWidth, inputHeight)
             
             // Run inference - output includes damage type probabilities and severity
-            val outputArray = Array(1) { FloatArray((DamageType.values().size - 2) + 1) } // -2 for UNKNOWN and NONE, +1 for severity
-            currentInterpreter.run(inputBuffer, outputArray)
+            val modelOutputArray = Array(1) { FloatArray((DamageType.values().size - 2) + 1) } // -2 for UNKNOWN and NONE, +1 for severity
+            currentInterpreter.run(modelInputBuffer, modelOutputArray)
             
             // Parse outputs
-            val outputs = outputArray[0]
+            val modelOutputValues = modelOutputArray[0]
             val damageTypeCount = DamageType.values().size - 2
-            val damageTypeProbabilities = outputs.sliceArray(0 until damageTypeCount)
-            val severity = outputs[damageTypeCount].coerceIn(0f, 1f)
+            val damageTypeProbabilities = modelOutputValues.sliceArray(0 until damageTypeCount)
+            val damageSeverityScore = modelOutputValues[damageTypeCount].coerceIn(0f, 1f)
             
             // Find highest confidence damage type
-            val maxIndex = damageTypeProbabilities.indices.maxByOrNull { damageTypeProbabilities[it] } ?: 0
-            val confidence = damageTypeProbabilities[maxIndex]
+            val highestConfidenceIndex = damageTypeProbabilities.indices.maxByOrNull { damageTypeProbabilities[it] } ?: 0
+            val detectionConfidence = damageTypeProbabilities[highestConfidenceIndex]
             
-            val damageType = when (maxIndex) {
+            val detectedDamageType = when (highestConfidenceIndex) {
                 0 -> DamageType.CRACK
                 1 -> DamageType.WATER_DAMAGE
                 2 -> DamageType.MOLD
@@ -98,11 +98,11 @@ class DamageEvaluator(private val context: Context) {
             }
             
             // If confidence is very low, consider no damage
-            val finalDamageType = if (confidence < 0.3f) DamageType.NONE else damageType
+            val finalDamageType = if (detectionConfidence < 0.3f) DamageType.NONE else detectedDamageType
             
-            return DamageEvaluationResult(finalDamageType, severity, confidence)
+            return DamageEvaluationResult(finalDamageType, damageSeverityScore, detectionConfidence)
             
-        } catch (e: Exception) {
+        } catch (evaluationException: Exception) {
             // Try fallback on error
             if (!isUsingFallback && fallbackInterpreter != null) {
                 interpreter = fallbackInterpreter
@@ -123,12 +123,12 @@ class DamageEvaluator(private val context: Context) {
      * Load model file from assets
      */
     private fun loadModelFile(filename: String): MappedByteBuffer {
-        val fileDescriptor = context.assets.openFd("models/$filename")
-        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
-        val fileChannel = inputStream.channel
-        val startOffset = fileDescriptor.startOffset
-        val declaredLength = fileDescriptor.declaredLength
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+        val assetFileDescriptor = context.assets.openFd("models/$filename")
+        val modelFileInputStream = FileInputStream(assetFileDescriptor.fileDescriptor)
+        val modelFileChannel = modelFileInputStream.channel
+        val modelStartOffset = assetFileDescriptor.startOffset
+        val modelDeclaredLength = assetFileDescriptor.declaredLength
+        return modelFileChannel.map(FileChannel.MapMode.READ_ONLY, modelStartOffset, modelDeclaredLength)
     }
     
     /**

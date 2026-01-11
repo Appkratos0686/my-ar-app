@@ -14,61 +14,61 @@ object ImagePreprocessor {
      */
     fun normalize(bitmap: Bitmap, targetWidth: Int, targetHeight: Int): FloatArray {
         val scaledBitmap = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
-        val floatArray = FloatArray(targetWidth * targetHeight * 3)
+        val normalizedPixelArray = FloatArray(targetWidth * targetHeight * 3)
         
-        var index = 0
-        for (y in 0 until targetHeight) {
-            for (x in 0 until targetWidth) {
-                val pixel = scaledBitmap.getPixel(x, y)
+        var pixelArrayIndex = 0
+        for (yPixel in 0 until targetHeight) {
+            for (xPixel in 0 until targetWidth) {
+                val pixelColor = scaledBitmap.getPixel(xPixel, yPixel)
                 
                 // Extract RGB values and normalize to [0, 1]
-                floatArray[index++] = ((pixel shr 16) and 0xFF) / 255.0f
-                floatArray[index++] = ((pixel shr 8) and 0xFF) / 255.0f
-                floatArray[index++] = (pixel and 0xFF) / 255.0f
+                normalizedPixelArray[pixelArrayIndex++] = ((pixelColor shr 16) and 0xFF) / 255.0f
+                normalizedPixelArray[pixelArrayIndex++] = ((pixelColor shr 8) and 0xFF) / 255.0f
+                normalizedPixelArray[pixelArrayIndex++] = (pixelColor and 0xFF) / 255.0f
             }
         }
         
-        return floatArray
+        return normalizedPixelArray
     }
     
     /**
      * Convert bitmap to ByteBuffer for TensorFlow Lite input
      */
     fun bitmapToByteBuffer(bitmap: Bitmap, targetWidth: Int, targetHeight: Int): ByteBuffer {
-        val byteBuffer = ByteBuffer.allocateDirect(4 * targetWidth * targetHeight * 3)
-        byteBuffer.order(ByteOrder.nativeOrder())
+        val tensorInputByteBuffer = ByteBuffer.allocateDirect(4 * targetWidth * targetHeight * 3)
+        tensorInputByteBuffer.order(ByteOrder.nativeOrder())
         
-        val floatArray = normalize(bitmap, targetWidth, targetHeight)
-        for (value in floatArray) {
-            byteBuffer.putFloat(value)
+        val normalizedPixelArray = normalize(bitmap, targetWidth, targetHeight)
+        for (normalizedPixelValue in normalizedPixelArray) {
+            tensorInputByteBuffer.putFloat(normalizedPixelValue)
         }
         
-        return byteBuffer
+        return tensorInputByteBuffer
     }
     
     /**
      * Apply data augmentation for training (rotation, flip, etc.)
      */
     fun augment(bitmap: Bitmap, rotation: Float = 0f, flipHorizontal: Boolean = false): Bitmap {
-        var augmented = bitmap
+        var augmentedBitmap = bitmap
         
         if (flipHorizontal) {
-            val matrix = android.graphics.Matrix()
-            matrix.preScale(-1.0f, 1.0f)
-            augmented = Bitmap.createBitmap(
-                augmented, 0, 0, augmented.width, augmented.height, matrix, true
+            val flipMatrix = android.graphics.Matrix()
+            flipMatrix.preScale(-1.0f, 1.0f)
+            augmentedBitmap = Bitmap.createBitmap(
+                augmentedBitmap, 0, 0, augmentedBitmap.width, augmentedBitmap.height, flipMatrix, true
             )
         }
         
         if (rotation != 0f) {
-            val matrix = android.graphics.Matrix()
-            matrix.postRotate(rotation)
-            augmented = Bitmap.createBitmap(
-                augmented, 0, 0, augmented.width, augmented.height, matrix, true
+            val rotationMatrix = android.graphics.Matrix()
+            rotationMatrix.postRotate(rotation)
+            augmentedBitmap = Bitmap.createBitmap(
+                augmentedBitmap, 0, 0, augmentedBitmap.width, augmentedBitmap.height, rotationMatrix, true
             )
         }
         
-        return augmented
+        return augmentedBitmap
     }
     
     /**
